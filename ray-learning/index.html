@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI DataLake × Ray × Aura 超节点深度研究合作方案</title>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Caveat:wght@400;600;700&family=Patrick+Hand&display=swap">
+<style>
+  :root {
+    --ink: #1e1e1e;
+    --paper: #fdfcf9;
+    --blue-fill: #d0ebff; --blue-line: #1971c2;
+    --green-fill: #d3f9d8; --green-line: #2f9e44;
+    --yellow-fill: #fff3bf; --yellow-line: #e67700;
+    --purple-fill: #e5dbff; --purple-line: #7048e8;
+    --pink-fill: #ffd8a8; --pink-line: #e8590c;
+    --cyan-fill: #c5f6fa; --cyan-line: #0c8599;
+    --red-fill: #ffc9c9; --red-line: #c92a2a;
+    --gray-fill: #e9ecef; --gray-line: #495057;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Noto Sans SC', -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.8;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 32px 80px; }
+
+  /* ===== 头部 ===== */
+  .doc-header {
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+    position: relative;
+  }
+  .doc-header .tag {
+    display: inline-block;
+    font-family: 'Caveat', cursive;
+    font-size: 22px;
+    color: var(--blue-line);
+    border: 2px dashed var(--blue-line);
+    padding: 2px 14px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+  }
+  .doc-header h1 {
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    line-height: 1.4;
+  }
+  .doc-header .sub {
+    margin-top: 10px;
+    font-size: 15px;
+    color: #555;
+    font-weight: 400;
+  }
+  .doc-header .meta {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #888;
+  }
+
+  /* ===== 章节 ===== */
+  section { margin-bottom: 48px; }
+  h2.sec-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding-left: 14px;
+    border-left: 6px solid var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2.sec-title .num {
+    font-family: 'Caveat', cursive;
+    font-size: 28px;
+    color: var(--blue-line);
+  }
+  h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 22px 0 10px;
+    color: var(--ink);
+  }
+  p { margin-bottom: 12px; text-align: justify; }
+  ul, ol { margin: 8px 0 14px 22px; }
+  li { margin-bottom: 6px; }
+
+  /* ===== 信息卡片 ===== */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .card {
+    border: 2.5px solid var(--ink);
+    border-radius: 10px;
+    padding: 16px 18px;
+    background: #fff;
+    position: relative;
+  }
+  .card.blue { background: var(--blue-fill); }
+  .card.green { background: var(--green-fill); }
+  .card.yellow { background: var(--yellow-fill); }
+  .card.purple { background: var(--purple-fill); }
+  .card.pink { background: var(--pink-fill); }
+  .card.cyan { background: var(--cyan-fill); }
+  .card .card-title {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .card-title .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--ink);
+    flex-shrink: 0;
+  }
+  .card p { font-size: 13.5px; margin-bottom: 0; line-height: 1.7; }
+
+  /* ===== 挑战列表 ===== */
+  .challenge-list { list-style: none; margin-left: 0; }
+  .challenge-list li {
+    border: 2px solid var(--red-line);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    background: #fff5f5;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .challenge-list .ch-num {
+    font-family: 'Caveat', cursive;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--red-line);
+    flex-shrink: 0;
+    min-width: 30px;
+  }
+  .challenge-list .ch-body strong { display: block; margin-bottom: 4px; }
+
+  /* ===== 架构图容器 ===== */
+  .arch-container {
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    background: #fff;
+    padding: 20px;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+  .arch-container svg { width: 100%; height: auto; display: block; min-width: 900px; }
+  .arch-note {
+    font-size: 13px;
+    color: #666;
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  /* ===== 研究方向 ===== */
+  .direction {
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .direction-header {
+    padding: 14px 20px;
+    font-weight: 700;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 2.5px solid var(--ink);
+  }
+  .direction-header .dir-num {
+    font-family: 'Caveat', cursive;
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .direction-body { padding: 16px 20px; }
+  .sub-topic {
+    border-left: 3px solid var(--gray-line);
+    padding: 8px 0 8px 16px;
+    margin-bottom: 14px;
+  }
+  .sub-topic:last-child { margin-bottom: 0; }
+  .sub-topic .st-title {
+    font-weight: 700;
+    font-size: 14.5px;
+    margin-bottom: 4px;
+  }
+  .sub-topic .st-meta {
+    font-size: 12.5px;
+    color: #666;
+    margin-bottom: 4px;
+  }
+  .sub-topic .st-desc { font-size: 13.5px; line-height: 1.7; }
+
+  .dir-1 .direction-header { background: var(--cyan-fill); }
+  .dir-1 .direction-header .dir-num { color: var(--cyan-line); }
+  .dir-2 .direction-header { background: var(--blue-fill); }
+  .dir-2 .direction-header .dir-num { color: var(--blue-line); }
+  .dir-3 .direction-header { background: var(--green-fill); }
+  .dir-3 .direction-header .dir-num { color: var(--green-line); }
+  .dir-4 .direction-header { background: var(--purple-fill); }
+  .dir-4 .direction-header .dir-num { color: var(--purple-line); }
+  .dir-5 .direction-header { background: var(--yellow-fill); }
+  .dir-5 .direction-header .dir-num { color: var(--yellow-line); }
+
+  /* 方向示意图 */
+  .dir-svg-wrap {
+    border: 2px dashed #aaa;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 0 0 18px 0;
+    background: #fdfcf9;
+  }
+  .dir-svg-wrap svg { width: 100%; height: auto; display: block; }
+  .dir-svg-caption {
+    font-size: 12.5px;
+    color: #888;
+    text-align: center;
+    margin-top: 6px;
+    font-style: italic;
+  }
+
+  /* ===== 价值表格 ===== */
+  .value-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .value-table th, .value-table td {
+    border: 2px solid var(--ink);
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .value-table th {
+    background: var(--ink);
+    color: #fff;
+    font-weight: 700;
+  }
+  .value-table tr:nth-child(even) td { background: #f8f9fa; }
+
+  /* ===== 手绘标注 ===== */
+  .hand-note {
+    font-family: 'Caveat', cursive;
+    font-size: 20px;
+    color: var(--pink-line);
+    transform: rotate(-2deg);
+    display: inline-block;
+  }
+
+  /* ===== 页脚 ===== */
+  .doc-footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 2px dashed #ccc;
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+  }
+
+  @media (max-width: 700px) {
+    .wrap { padding: 20px 16px 60px; }
+    .doc-header h1 { font-size: 22px; }
+    h2.sec-title { font-size: 18px; }
+    .card-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ==================== 头部 ==================== -->
+<header class="doc-header">
+  <span class="tag">Research Collaboration Proposal</span>
+  <h1>面向超大规模超节点的 AI DataLake 深度研究合作方案</h1>
+  <div class="sub">基于 Ray 统一资源池化与 Aura 多模态数据引擎的逐层协同优化</div>
+  <div class="meta">版本：V1.0 ｜ 面向高校科研合作 ｜ 聚焦未来竞争力方向</div>
+</header>
+
+<!-- ==================== 一、研究背景 ==================== -->
+<section>
+  <h2 class="sec-title"><span class="num">01</span>研究背景</h2>
+
+  <p>当前 AI 基础设施正经历一场深刻的架构变革。以华为灵衢为代表的<strong>大规模超节点</strong>正在成为主流算力形态——通过灵衢高速互联、CXL 内存池化等技术，将数十颗 CPU/GPU/NPU 紧耦合为一个"超级计算机"，节点间通信延迟从微秒级降至纳秒级，互联带宽提升一个数量级。</p>
+
+  <p>这一趋势意味着：<strong>只有从底向上逐层将系统池化，才能真正释放超节点高速互联的能力。</strong>传统"一台机器一个节点"的分布式系统设计，在超节点时代会造成严重的资源碎片和通信瓶颈——紧耦合的硬件被松耦合的软件栈割裂，高速互联能力无法被上层应用感知和利用。</p>
+
+  <p>我们的 AI DataLake 产品基于云容器发放异构通算与智算资源（CPU/GPU/NPU），通过 <strong>Ray</strong> 做统一资源池化管理，在 Ray 之上运行自研的多模态数据处理与向量湖检索引擎 <strong>Aura</strong>。当前产品已具备基础的 serverless 数据处理能力，但面对超节点浪潮，系统需要向<strong>紧耦合 scale-up 与 scale-out 协同</strong>的方向深度演进，将 serverless 引擎与分布式框架的协同优化推向更深入的层次。</p>
+
+  <div class="card-grid">
+    <div class="card blue">
+      <div class="card-title"><span class="dot"></span>硬件趋势</div>
+      <p>华为灵衢超节点规模化部署，CXL 内存池化、芯片间高速互联成为标配，单机算力密度提升 5-10 倍。</p>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot"></span>软件缺口</div>
+      <p>Ray 以"节点"为资源单元，无法感知超节点内拓扑；Aura 与 Ray 之间存在语义断层，调度与数据流转各自为政。</p>
+    </div>
+    <div class="card yellow">
+      <div class="card-title"><span class="dot"></span>合作契机</div>
+      <p>超节点系统软件是学术界前沿热点，与高校合作开展深度研究，可同时产出学术成果与产品竞争力。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 二、方案现状 ==================== -->
+<section>
+  <h2 class="sec-title"><span class="num">02</span>方案现状</h2>
+
+  <h3>2.1 当前技术栈</h3>
+  <ul>
+    <li><strong>资源层</strong>：基于云容器发放 CPU/GPU/NPU 异构资源，支持多代次算力混部。</li>
+    <li><strong>池化层</strong>：Ray 作为统一资源调度与分布式执行框架，实现跨节点的资源池化。</li>
+    <li><strong>引擎层</strong>：Aura 自研数据引擎，提供多模态数据处理流水线与向量湖检索能力。</li>
+    <li><strong>服务层</strong>：Serverless 化的数据处理服务，用户按需提交作业，无需管理集群。</li>
+  </ul>
+
+  <h3>2.2 已具备的能力</h3>
+  <div class="card-grid">
+    <div class="card cyan">
+      <div class="card-title"><span class="dot"></span>异构资源统一调度</div>
+      <p>Ray 已能统一管理 CPU/GPU/NPU 资源，支持自定义资源类型，基础的任务分发与资源匹配可用。</p>
+    </div>
+    <div class="card purple">
+      <div class="card-title"><span class="dot"></span>多模态数据处理</div>
+      <p>Aura 支持文本、图像、音频等多模态数据的摄入、清洗、特征提取与向量化流水线。</p>
+    </div>
+    <div class="card pink">
+      <div class="card-title"><span class="dot"></span>向量湖检索</div>
+      <p>Aura 内置向量索引与近似最近邻检索能力，支持亿级向量的低延迟查询。</p>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot"></span>Serverless 交付</div>
+      <p>用户以函数/作业方式提交数据处理任务，系统自动弹性伸缩，按用量计费。</p>
+    </div>
+  </div>
+
+  <h3>2.3 当前的核心局限</h3>
+  <p>现有架构本质上仍是<strong>"节点级松耦合"</strong>设计：Ray 将每台物理机视为一个独立节点，Aura 在 Ray 之上做任务调度，两层之间缺乏语义双向传递；数据在远端缓存、Ray 对象存储、进程内内存之间流转时存在重复拷贝和语义割裂；serverless 的无状态弹性与超节点紧耦合作业的需求存在根本矛盾。这些局限在千节点规模下尚可接受，但在万节点超节点集群中会被急剧放大。</p>
+</section>
+
+<!-- ==================== 三、关键挑战 ==================== -->
+<section>
+  <h2 class="sec-title"><span class="num">03</span>关键挑战</h2>
+
+  <!-- 关键挑战全景图 -->
+  <div class="dir-svg-wrap">
+    <svg viewBox="0 0 1000 510" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="chr1" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="20"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter>
+        <filter id="chr2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="22"/><feDisplacementMap in="SourceGraphic" scale="1.3"/></filter>
+        <marker id="charr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#c92a2a"/></marker>
+      </defs>
+      <!-- 标题 -->
+      <text x="500" y="28" text-anchor="middle" font-family="Caveat, cursive" font-size="18" font-weight="700" fill="#c92a2a">当前系统面临的六大核心挑战</text>
+
+      <!-- ===== 中心系统栈 ===== -->
+      <!-- 业务层 -->
+      <rect x="370" y="45" width="260" height="38" rx="6" fill="#fff3bf" stroke="#e67700" stroke-width="2" filter="url(#chr1)"/>
+      <text x="500" y="69" text-anchor="middle" font-size="13" font-weight="700">业务场景（多模态 / RAG / RL / Agent）</text>
+      <!-- Aura 引擎层 -->
+      <rect x="370" y="95" width="260" height="55" rx="6" fill="#e5dbff" stroke="#7048e8" stroke-width="2" filter="url(#chr1)"/>
+      <text x="500" y="118" text-anchor="middle" font-size="13" font-weight="700">Aura 数据引擎</text>
+      <text x="500" y="136" text-anchor="middle" font-size="10.5" fill="#666">向量湖检索 · 多模态处理 · 轨迹存储</text>
+      <!-- 数据流转层 -->
+      <rect x="370" y="162" width="260" height="50" rx="6" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2" filter="url(#chr1)"/>
+      <text x="500" y="184" text-anchor="middle" font-size="13" font-weight="700">三级数据流转</text>
+      <text x="500" y="201" text-anchor="middle" font-size="10.5" fill="#666">远端Cache ↔ Ray对象存储 ↔ 进程内存</text>
+      <!-- 调度层 -->
+      <rect x="370" y="224" width="260" height="65" rx="6" fill="#d0ebff" stroke="#1971c2" stroke-width="2" filter="url(#chr1)"/>
+      <text x="500" y="247" text-anchor="middle" font-size="13" font-weight="700">双层调度（Ray + Aura）</text>
+      <text x="500" y="265" text-anchor="middle" font-size="10.5" fill="#666">资源调度 ⟷ 任务调度</text>
+      <text x="500" y="280" text-anchor="middle" font-size="10.5" fill="#666">万节点控制面 · 集群韧性</text>
+      <!-- Ray 池化层 -->
+      <rect x="370" y="301" width="260" height="48" rx="6" fill="#c5f6fa" stroke="#0c8599" stroke-width="2" filter="url(#chr1)"/>
+      <text x="500" y="323" text-anchor="middle" font-size="13" font-weight="700">Ray 统一资源池化</text>
+      <text x="500" y="340" text-anchor="middle" font-size="10.5" fill="#666">CPU / GPU / NPU 扁平资源模型</text>
+      <!-- 硬件层 -->
+      <rect x="370" y="361" width="260" height="50" rx="6" fill="#e9ecef" stroke="#495057" stroke-width="2" filter="url(#chr1)"/>
+      <text x="500" y="383" text-anchor="middle" font-size="13" font-weight="700">华为灵衢超节点硬件</text>
+      <text x="500" y="400" text-anchor="middle" font-size="10.5" fill="#666">灵衢互联 · CXL内存池 · 多代次NPU</text>
+
+      <!-- ===== 层间断层标记（红色闪电/断裂） ===== -->
+      <!-- C1: 硬件→池化断层 -->
+      <line x1="370" y1="354" x2="630" y2="354" stroke="#c92a2a" stroke-width="3" stroke-dasharray="8,4"/>
+      <text x="500" y="350" text-anchor="middle" font-family="Caveat, cursive" font-size="13" fill="#c92a2a" font-weight="700">✕ 硬件特性不可感知 ✕</text>
+      <!-- C2: 调度层内部语义断层 -->
+      <line x1="455" y1="262" x2="545" y2="262" stroke="#c92a2a" stroke-width="2.5" stroke-dasharray="6,3"/>
+      <text x="500" y="258" text-anchor="middle" font-family="Caveat, cursive" font-size="10" fill="#c92a2a">语义断层</text>
+
+      <!-- ===== 左侧挑战卡片 ===== -->
+      <!-- C1 -->
+      <rect x="20" y="345" width="310" height="65" rx="8" fill="#fff5f5" stroke="#c92a2a" stroke-width="2.5" filter="url(#chr1)"/>
+      <rect x="20" y="345" width="45" height="65" rx="8" fill="#c92a2a"/>
+      <text x="42" y="384" text-anchor="middle" font-family="Caveat, cursive" font-size="24" font-weight="700" fill="#fff">C1</text>
+      <text x="80" y="368" font-size="12.5" font-weight="700">超节点硬件特性无法被上层感知</text>
+      <text x="80" y="386" font-size="10.5" fill="#666">扁平模型无法表达 NUMA/灵衢拓扑/</text>
+      <text x="80" y="400" font-size="10.5" fill="#666">CXL 内存层次/NPU 代次差异</text>
+      <line x1="330" y1="377" x2="365" y2="360" stroke="#c92a2a" stroke-width="2" marker-end="url(#charr)"/>
+
+      <!-- C3 -->
+      <rect x="20" y="160" width="310" height="60" rx="8" fill="#fff5f5" stroke="#c92a2a" stroke-width="2.5" filter="url(#chr1)"/>
+      <rect x="20" y="160" width="45" height="60" rx="8" fill="#c92a2a"/>
+      <text x="42" y="196" text-anchor="middle" font-family="Caveat, cursive" font-size="24" font-weight="700" fill="#fff">C3</text>
+      <text x="80" y="182" font-size="12.5" font-weight="700">三级数据流转层语义不统一</text>
+      <text x="80" y="200" font-size="10.5" fill="#666">各层独立管理生命周期，跨层重复</text>
+      <text x="80" y="214" font-size="10.5" fill="#666">拷贝，缺乏流式语义与一致性</text>
+      <line x1="330" y1="190" x2="365" y2="187" stroke="#c92a2a" stroke-width="2" marker-end="url(#charr)"/>
+
+      <!-- C5 贯穿性矛盾（左侧大卡片） -->
+      <rect x="20" y="50" width="310" height="85" rx="8" fill="#fff5f5" stroke="#c92a2a" stroke-width="2.5" filter="url(#chr1)"/>
+      <rect x="20" y="50" width="45" height="85" rx="8" fill="#c92a2a"/>
+      <text x="42" y="100" text-anchor="middle" font-family="Caveat, cursive" font-size="24" font-weight="700" fill="#fff">C5</text>
+      <text x="80" y="73" font-size="12.5" font-weight="700">Serverless 与紧耦合的根本矛盾</text>
+      <text x="80" y="91" font-size="10.5" fill="#666">Serverless：无状态·冷启动·细粒度弹性</text>
+      <text x="80" y="106" font-size="10.5" fill="#666">紧耦合：长驻进程·低延迟通信·全局同步</text>
+      <text x="80" y="122" font-size="10.5" fill="#c92a2a" font-weight="600">两种范式直接冲突，贯穿全栈</text>
+      <line x1="330" y1="92" x2="365" y2="120" stroke="#c92a2a" stroke-width="2" marker-end="url(#charr)"/>
+
+      <!-- ===== 右侧挑战卡片 ===== -->
+      <!-- C2 -->
+      <rect x="670" y="215" width="310" height="60" rx="8" fill="#fff5f5" stroke="#c92a2a" stroke-width="2.5" filter="url(#chr1)"/>
+      <rect x="935" y="215" width="45" height="60" rx="8" fill="#c92a2a"/>
+      <text x="957" y="251" text-anchor="middle" font-family="Caveat, cursive" font-size="24" font-weight="700" fill="#fff">C2</text>
+      <text x="685" y="237" font-size="12.5" font-weight="700">双层调度各自为政，语义断层</text>
+      <text x="685" y="255" font-size="10.5" fill="#666">Ray 不懂任务数据流，Aura 不感知</text>
+      <text x="685" y="269" font-size="10.5" fill="#666">拓扑，导致双重碎片化与通信激增</text>
+      <line x1="670" y1="245" x2="635" y2="257" stroke="#c92a2a" stroke-width="2" marker-end="url(#charr)"/>
+
+      <!-- C4 -->
+      <rect x="670" y="290" width="310" height="60" rx="8" fill="#fff5f5" stroke="#c92a2a" stroke-width="2.5" filter="url(#chr1)"/>
+      <rect x="935" y="290" width="45" height="60" rx="8" fill="#c92a2a"/>
+      <text x="957" y="326" text-anchor="middle" font-family="Caveat, cursive" font-size="24" font-weight="700" fill="#fff">C4</text>
+      <text x="685" y="312" font-size="12.5" font-weight="700">万节点控制面与韧性瓶颈</text>
+      <text x="685" y="330" font-size="10.5" fill="#666">GCS 心跳风暴·调度延迟·故障恢复慢</text>
+      <text x="685" y="344" font-size="10.5" fill="#666">超节点故障域大，迁移能力不足</text>
+      <line x1="670" y1="320" x2="635" y2="310" stroke="#c92a2a" stroke-width="2" marker-end="url(#charr)"/>
+
+      <!-- C6 -->
+      <rect x="670" y="90" width="310" height="65" rx="8" fill="#fff5f5" stroke="#c92a2a" stroke-width="2.5" filter="url(#chr1)"/>
+      <rect x="935" y="90" width="45" height="65" rx="8" fill="#c92a2a"/>
+      <text x="957" y="128" text-anchor="middle" font-family="Caveat, cursive" font-size="24" font-weight="700" fill="#fff">C6</text>
+      <text x="685" y="112" font-size="12.5" font-weight="700">Agent 轨迹与多模态引擎能力不足</text>
+      <text x="685" y="130" font-size="10.5" fill="#666">嵌套JSON+多模态+时序+图的混合体</text>
+      <text x="685" y="144" font-size="10.5" fill="#666">传统存储不适用，缺软硬协同加速</text>
+      <line x1="670" y1="122" x2="635" y2="122" stroke="#c92a2a" stroke-width="2" marker-end="url(#charr)"/>
+
+      <!-- 底部总结 -->
+      <rect x="200" y="440" width="600" height="50" rx="8" fill="#fff3bf" stroke="#e67700" stroke-width="2" filter="url(#chr1)"/>
+      <text x="500" y="462" text-anchor="middle" font-size="13" font-weight="700" fill="#e67700">核心矛盾：松耦合软件栈 ↔ 紧耦合超节点硬件</text>
+      <text x="500" y="480" text-anchor="middle" font-size="11" fill="#666">不从底向上逐层池化与语义拉通，超节点高速互联能力将被严重浪费</text>
+    </svg>
+    <div class="dir-svg-caption">图 C：当前系统六大核心挑战全景示意（红色标记为问题断层）</div>
+  </div>
+
+  <ul class="challenge-list">
+    <li>
+      <span class="ch-num">C1</span>
+      <div class="ch-body">
+        <strong>超节点硬件特性无法被上层感知</strong>
+        Ray 的扁平资源模型无法表达超节点内的 NUMA 域、灵衢互联拓扑、CXL 内存池层次和 NPU 代次差异，导致调度决策缺乏精确的硬件信息输入。
+      </div>
+    </li>
+    <li>
+      <span class="ch-num">C2</span>
+      <div class="ch-body">
+        <strong>双层调度各自为政，语义断层</strong>
+        Ray 资源调度不理解 Aura 任务的数据流依赖和通信模式，Aura 任务调度不感知底层拓扑和资源碎片，两层独立决策导致"双重碎片化"和通信开销激增。
+      </div>
+    </li>
+    <li>
+      <span class="ch-num">C3</span>
+      <div class="ch-body">
+        <strong>三级数据流转层语义不统一</strong>
+        远端缓存、Ray 数据系统、进程内内存三层各自管理数据生命周期，对象格式不统一，跨层需序列化拷贝，缺乏流式数据语义和一致性保障。
+      </div>
+    </li>
+    <li>
+      <span class="ch-num">C4</span>
+      <div class="ch-body">
+        <strong>万节点规模下的控制面与韧性瓶颈</strong>
+        Ray GCS 在万节点规模下面临心跳风暴、调度延迟、故障恢复慢等问题；超节点故障域大，单节点故障影响面广，作业动态迁移能力不足。
+      </div>
+    </li>
+    <li>
+      <span class="ch-num">C5</span>
+      <div class="ch-body">
+        <strong>Serverless 与紧耦合的根本矛盾</strong>
+        Serverless 追求无状态、细粒度弹性、快速冷启动；超节点紧耦合作业（分布式训练、在线检索）需要长驻进程、低延迟通信、全局同步，两者范式冲突。
+      </div>
+    </li>
+    <li>
+      <span class="ch-num">C6</span>
+      <div class="ch-body">
+        <strong>Agent 轨迹与多模态数据的引擎能力不足</strong>
+        Agent 轨迹是复杂嵌套 JSON + 多模态字段 + 时间序列 + 图结构的混合体，传统列式存储和向量索引无法高效支撑；复杂 JSON 处理缺乏软硬协同加速。
+      </div>
+    </li>
+  </ul>
+</section>
+
+<!-- ==================== 四、总体方案 ==================== -->
+<section>
+  <h2 class="sec-title"><span class="num">04</span>总体方案</h2>
+
+  <p>针对上述挑战，我们提出<strong>"从底向上逐层池化、双层调度语义拉通、三级数据流转统一、Serverless 与紧耦合协同"</strong>的总体技术路线。核心思想是：让每一层都能感知下层的硬件特性，并向上层暴露精确的语义接口，最终实现超节点内紧耦合 scale-up 与超节点间 scale-out 的高效协同。</p>
+
+  <p>整体技术架构如下图所示，自底向上分为<strong>硬件层、资源池化层、双层调度层、三级数据流转层、Aura 引擎层</strong>，并以 <strong>Serverless × 紧耦合协同范式</strong>贯穿各层。</p>
+
+  <!-- ===== Excalidraw 风格架构图 ===== -->
+  <div class="arch-container">
+    <svg viewBox="0 0 1200 820" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="rough1" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="2" seed="3" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.8"/>
+        </filter>
+        <filter id="rough2" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="7" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.5"/>
+        </filter>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="#1e1e1e"/>
+        </marker>
+        <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,1 L9,5 L0,9 z" fill="#1971c2"/>
+        </marker>
+      </defs>
+
+      <pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse">
+        <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#f0f0f0" stroke-width="0.5"/>
+      </pattern>
+      <rect width="1200" height="820" fill="url(#grid)"/>
+
+      <!-- 左侧贯穿条 -->
+      <rect x="18" y="80" width="78" height="640" rx="10" fill="#ffd8a8" stroke="#e8590c" stroke-width="2.5" filter="url(#rough1)"/>
+      <text x="57" y="80" text-anchor="middle" font-family="Caveat, cursive" font-size="18" font-weight="700" fill="#e8590c" transform="rotate(-90 57 410)">Serverless × 紧耦合协同范式</text>
+      <text x="57" y="175" text-anchor="middle" font-family="Caveat, cursive" font-size="12" fill="#e8590c" transform="rotate(-90 57 410)">有状态Serverless · 弹性并行度 · 算力切片隔离</text>
+
+      <!-- 业务场景层 -->
+      <rect x="115" y="15" width="1065" height="55" rx="8" fill="#fff3bf" stroke="#e67700" stroke-width="2.5" filter="url(#rough2)"/>
+      <text x="130" y="38" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#e67700">业务场景层</text>
+      <rect x="225" y="24" width="200" height="37" rx="6" fill="#fff" stroke="#e67700" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="325" y="48" text-anchor="middle" font-size="13" font-weight="500">多模态数据处理</text>
+      <rect x="440" y="24" width="200" height="37" rx="6" fill="#fff" stroke="#e67700" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="540" y="48" text-anchor="middle" font-size="13" font-weight="500">向量湖检索 (RAG)</text>
+      <rect x="655" y="24" width="200" height="37" rx="6" fill="#fff" stroke="#e67700" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="755" y="48" text-anchor="middle" font-size="13" font-weight="500">大规模 RL 训练</text>
+      <rect x="870" y="24" width="200" height="37" rx="6" fill="#fff" stroke="#e67700" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="970" y="48" text-anchor="middle" font-size="13" font-weight="500">Agent 应用与轨迹</text>
+      <line x1="650" y1="80" x2="650" y2="72" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arr)"/>
+
+      <!-- Aura 引擎层 -->
+      <rect x="115" y="85" width="1065" height="120" rx="8" fill="#e5dbff" stroke="#7048e8" stroke-width="2.5" filter="url(#rough1)"/>
+      <text x="130" y="108" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#7048e8">Aura 数据引擎层</text>
+      <rect x="130" y="118" width="245" height="75" rx="6" fill="#fff" stroke="#7048e8" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="252" y="142" text-anchor="middle" font-size="13" font-weight="700">Agent 轨迹存储引擎</text>
+      <text x="252" y="162" text-anchor="middle" font-size="11" fill="#666">嵌套JSON · 时间序列</text>
+      <text x="252" y="178" text-anchor="middle" font-size="11" fill="#666">图结构 · 多模态引用</text>
+      <rect x="390" y="118" width="245" height="75" rx="6" fill="#fff" stroke="#7048e8" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="512" y="142" text-anchor="middle" font-size="13" font-weight="700">多模态向量湖检索</text>
+      <text x="512" y="162" text-anchor="middle" font-size="11" fill="#666">统一向量索引 · 混合检索</text>
+      <text x="512" y="178" text-anchor="middle" font-size="11" fill="#666">增量更新 · 精度权衡</text>
+      <rect x="650" y="118" width="245" height="75" rx="6" fill="#fff" stroke="#7048e8" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="772" y="142" text-anchor="middle" font-size="13" font-weight="700">复杂 JSON 软硬加速</text>
+      <text x="772" y="162" text-anchor="middle" font-size="11" fill="#666">FPGA/NPU解析 · 自动索引</text>
+      <text x="772" y="178" text-anchor="middle" font-size="11" fill="#666">行列混合 · 查询下推</text>
+      <rect x="910" y="118" width="255" height="75" rx="6" fill="#fff" stroke="#7048e8" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="1037" y="142" text-anchor="middle" font-size="13" font-weight="700">非结构化处理流水线</text>
+      <text x="1037" y="162" text-anchor="middle" font-size="11" fill="#666">解析→特征→切分→向量化</text>
+      <text x="1037" y="178" text-anchor="middle" font-size="11" fill="#666">内容级检索 · RAG燃料</text>
+      <line x1="650" y1="225" x2="650" y2="217" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arr)"/>
+
+      <!-- 数据流转层 -->
+      <rect x="115" y="230" width="1065" height="135" rx="8" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2.5" filter="url(#rough1)"/>
+      <text x="130" y="253" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#2f9e44">三级数据流转层（拉通统一语义）</text>
+      <rect x="130" y="262" width="310" height="42" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="285" y="288" text-anchor="middle" font-size="13" font-weight="700">远端 Cache 层</text>
+      <line x1="445" y1="283" x2="470" y2="283" stroke="#2f9e44" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="470" y1="290" x2="445" y2="290" stroke="#2f9e44" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="475" y="262" width="310" height="42" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="630" y="288" text-anchor="middle" font-size="13" font-weight="700">Ray 数据系统层（对象存储）</text>
+      <line x1="790" y1="283" x2="815" y2="283" stroke="#2f9e44" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="815" y1="290" x2="790" y2="290" stroke="#2f9e44" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="820" y="262" width="345" height="42" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="992" y="288" text-anchor="middle" font-size="13" font-weight="700">进程内内存层</text>
+      <rect x="130" y="315" width="250" height="38" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#rough2)"/>
+      <text x="255" y="339" text-anchor="middle" font-size="12">分布式共享内存 · 流式语义</text>
+      <rect x="395" y="315" width="250" height="38" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#rough2)"/>
+      <text x="520" y="339" text-anchor="middle" font-size="12">大规模 Shuffle / RDMA</text>
+      <rect x="660" y="315" width="250" height="38" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#rough2)"/>
+      <text x="785" y="339" text-anchor="middle" font-size="12">点对点通信 · 背压控制</text>
+      <rect x="925" y="315" width="240" height="38" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#rough2)"/>
+      <text x="1045" y="339" text-anchor="middle" font-size="12">RL Sample 级数据系统</text>
+      <line x1="650" y1="380" x2="650" y2="372" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arr)"/>
+
+      <!-- 双层调度层 -->
+      <rect x="115" y="385" width="1065" height="130" rx="8" fill="#d0ebff" stroke="#1971c2" stroke-width="2.5" filter="url(#rough1)"/>
+      <text x="130" y="408" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#1971c2">双层协同调度层</text>
+      <rect x="130" y="418" width="460" height="55" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="360" y="440" text-anchor="middle" font-size="14" font-weight="700">Ray 资源调度</text>
+      <text x="360" y="460" text-anchor="middle" font-size="11" fill="#666">拓扑感知 · 代次感知 · 池化切片 · 资源匹配</text>
+      <line x1="600" y1="440" x2="640" y2="440" stroke="#1971c2" stroke-width="2.5" marker-end="url(#arr-blue)"/>
+      <line x1="640" y1="452" x2="600" y2="452" stroke="#1971c2" stroke-width="2.5" marker-end="url(#arr-blue)"/>
+      <text x="620" y="432" text-anchor="middle" font-family="Caveat, cursive" font-size="12" fill="#1971c2">语义双向传递</text>
+      <rect x="650" y="418" width="515" height="55" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="907" y="440" text-anchor="middle" font-size="14" font-weight="700">Aura 任务调度</text>
+      <text x="907" y="460" text-anchor="middle" font-size="11" fill="#666">数据流依赖 · 通信模式 · 数据局部性 · SLA感知</text>
+      <rect x="130" y="483" width="250" height="25" rx="5" fill="#fff" stroke="#1971c2" stroke-width="1.3" stroke-dasharray="4,3"/>
+      <text x="255" y="500" text-anchor="middle" font-size="11.5">尾延迟 / SLA 优化</text>
+      <rect x="395" y="483" width="250" height="25" rx="5" fill="#fff" stroke="#1971c2" stroke-width="1.3" stroke-dasharray="4,3"/>
+      <text x="520" y="500" text-anchor="middle" font-size="11.5">万节点控制面扩展</text>
+      <rect x="660" y="483" width="250" height="25" rx="5" fill="#fff" stroke="#1971c2" stroke-width="1.3" stroke-dasharray="4,3"/>
+      <text x="785" y="500" text-anchor="middle" font-size="11.5">作业动态迁移 / 韧性</text>
+      <rect x="925" y="483" width="240" height="25" rx="5" fill="#fff" stroke="#1971c2" stroke-width="1.3" stroke-dasharray="4,3"/>
+      <text x="1045" y="500" text-anchor="middle" font-size="11.5">多目标全局优化</text>
+      <line x1="650" y1="535" x2="650" y2="527" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arr)"/>
+
+      <!-- 资源池化层 -->
+      <rect x="115" y="540" width="1065" height="80" rx="8" fill="#c5f6fa" stroke="#0c8599" stroke-width="2.5" filter="url(#rough1)"/>
+      <text x="130" y="563" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#0c8599">Ray 统一资源池化层</text>
+      <rect x="130" y="572" width="330" height="38" rx="6" fill="#fff" stroke="#0c8599" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="295" y="596" text-anchor="middle" font-size="13" font-weight="700">超节点拓扑建模</text>
+      <rect x="475" y="572" width="330" height="38" rx="6" fill="#fff" stroke="#0c8599" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="640" y="596" text-anchor="middle" font-size="13" font-weight="700">CXL 内存池化管理</text>
+      <rect x="820" y="572" width="345" height="38" rx="6" fill="#fff" stroke="#0c8599" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="992" y="596" text-anchor="middle" font-size="13" font-weight="700">异构 NPU/GPU 统一抽象</text>
+      <line x1="650" y1="635" x2="650" y2="627" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arr)"/>
+
+      <!-- 硬件层 -->
+      <rect x="115" y="640" width="1065" height="80" rx="8" fill="#e9ecef" stroke="#495057" stroke-width="2.5" filter="url(#rough1)"/>
+      <text x="130" y="663" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#495057">硬件层：华为灵衢大规模超节点</text>
+      <rect x="130" y="672" width="330" height="38" rx="6" fill="#fff" stroke="#495057" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="295" y="696" text-anchor="middle" font-size="13" font-weight="700">CPU / GPU / NPU（昇腾）</text>
+      <rect x="475" y="672" width="330" height="38" rx="6" fill="#fff" stroke="#495057" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="640" y="696" text-anchor="middle" font-size="13" font-weight="700">灵衢高速互联（纳秒级）</text>
+      <rect x="820" y="672" width="345" height="38" rx="6" fill="#fff" stroke="#495057" stroke-width="1.8" filter="url(#rough2)"/>
+      <text x="992" y="696" text-anchor="middle" font-size="13" font-weight="700">CXL 内存池 / HBM / DRAM</text>
+
+      <!-- 底部标注 -->
+      <text x="600" y="755" text-anchor="middle" font-family="Caveat, cursive" font-size="18" fill="#e8590c">↑ 自底向上逐层池化，层间语义双向拉通 ↑</text>
+      <text x="600" y="780" text-anchor="middle" font-size="12" fill="#888">超节点内紧耦合 scale-up ＋ 超节点间 scale-out 协同</text>
+
+      <!-- 核心拉通点标注 -->
+      <circle cx="620" cy="446" r="24" fill="none" stroke="#e8590c" stroke-width="2" stroke-dasharray="4,3" filter="url(#rough2)"/>
+      <text x="620" y="410" text-anchor="middle" font-family="Caveat, cursive" font-size="13" fill="#e8590c">核心拉通点</text>
+    </svg>
+  </div>
+  <div class="arch-note">图 1：面向超大规模超节点的 AI DataLake 总体技术架构（Excalidraw 风格示意）</div>
+
+  <p>架构的核心设计理念是<strong>"逐层池化、语义拉通"</strong>：硬件层将超节点内的算力和内存池化暴露给 Ray；Ray 资源池化层建立拓扑感知的资源模型；双层调度层通过语义双向传递避免决策冲突；三级数据流转层统一对象模型和流式语义；Aura 引擎层面向 Agent 和多模态场景做深度优化；Serverless × 紧耦合范式贯穿全栈，解决弹性与性能的根本矛盾。</p>
+</section>
+
+<!-- ==================== 五、合作研究方向 ==================== -->
+<section>
+  <h2 class="sec-title"><span class="num">05</span>合作研究方向</h2>
+  <p>基于上述架构，我们提炼出<strong>五大研究方向、共 20 项核心课题</strong>，按自底向上的层次组织。每项课题均包含明确的研究问题和预期产出，适合与高校团队开展深度合作。</p>
+
+  <div class="direction dir-1">
+    <div class="direction-header"><span class="dir-num">D1</span>超节点异构算力池化与统一编程抽象</div>
+    <div class="direction-body">
+      <!-- D1 示意图 -->
+      <div class="dir-svg-wrap">
+        <svg viewBox="0 0 1000 370" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="d1r1" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="2"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter>
+            <filter id="d1r2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="5"/><feDisplacementMap in="SourceGraphic" scale="1.3"/></filter>
+            <marker id="d1arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1e1e1e"/></marker>
+          </defs>
+          <!-- 左侧：传统扁平模型 -->
+          <text x="160" y="28" text-anchor="middle" font-family="Caveat, cursive" font-size="17" font-weight="700" fill="#495057">传统 Ray 扁平资源模型</text>
+          <rect x="30" y="40" width="260" height="200" rx="8" fill="#e9ecef" stroke="#495057" stroke-width="2.5" filter="url(#d1r1)"/>
+          <rect x="50" y="60" width="220" height="32" rx="5" fill="#fff" stroke="#495057" stroke-width="1.5" filter="url(#d1r2)"/>
+          <text x="160" y="81" text-anchor="middle" font-size="13" font-weight="600">CPU : 64 cores</text>
+          <rect x="50" y="102" width="220" height="32" rx="5" fill="#fff" stroke="#495057" stroke-width="1.5" filter="url(#d1r2)"/>
+          <text x="160" y="123" text-anchor="middle" font-size="13" font-weight="600">GPU : 8 cards</text>
+          <rect x="50" y="144" width="220" height="32" rx="5" fill="#fff" stroke="#495057" stroke-width="1.5" filter="url(#d1r2)"/>
+          <text x="160" y="165" text-anchor="middle" font-size="13" font-weight="600">NPU : 4 cards</text>
+          <text x="160" y="210" text-anchor="middle" font-size="11.5" fill="#c92a2a" font-family="Caveat, cursive" font-size="14">无拓扑 · 无代次 · 无内存层次</text>
+          <text x="160" y="228" text-anchor="middle" font-size="11" fill="#868e96">所有资源一视同仁</text>
+          <!-- 中间箭头 -->
+          <line x1="310" y1="140" x2="370" y2="140" stroke="#0c8599" stroke-width="3" marker-end="url(#d1arr)"/>
+          <text x="340" y="125" text-anchor="middle" font-family="Caveat, cursive" font-size="14" fill="#0c8599">统一</text>
+          <text x="340" y="160" text-anchor="middle" font-family="Caveat, cursive" font-size="14" fill="#0c8599">抽象</text>
+          <!-- 右侧：超节点拓扑模型 -->
+          <text x="730" y="28" text-anchor="middle" font-family="Caveat, cursive" font-size="17" font-weight="700" fill="#0c8599">超节点感知的拓扑资源模型</text>
+          <rect x="400" y="40" width="570" height="200" rx="8" fill="#c5f6fa" stroke="#0c8599" stroke-width="2.5" filter="url(#d1r1)"/>
+          <text x="415" y="60" font-size="11" fill="#0c8599" font-weight="600">超节点 (SuperNode)</text>
+          <!-- NUMA 域 1 -->
+          <rect x="420" y="70" width="250" height="100" rx="6" fill="#fff" stroke="#0c8599" stroke-width="1.8" stroke-dasharray="5,3" filter="url(#d1r2)"/>
+          <text x="435" y="88" font-size="11" fill="#0c8599" font-weight="600">NUMA Domain 0</text>
+          <rect x="435" y="96" width="100" height="28" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.3" filter="url(#d1r2)"/>
+          <text x="485" y="114" text-anchor="middle" font-size="11" font-weight="600">CPU ×32</text>
+          <rect x="550" y="96" width="100" height="28" rx="4" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.3" filter="url(#d1r2)"/>
+          <text x="600" y="114" text-anchor="middle" font-size="11" font-weight="600">NPU 代次A ×2</text>
+          <rect x="435" y="132" width="215" height="28" rx="4" fill="#e9ecef" stroke="#495057" stroke-width="1.2" filter="url(#d1r2)"/>
+          <text x="542" y="150" text-anchor="middle" font-size="11">DRAM 256GB · HBM 64GB</text>
+          <!-- NUMA 域 2 -->
+          <rect x="700" y="70" width="250" height="100" rx="6" fill="#fff" stroke="#0c8599" stroke-width="1.8" stroke-dasharray="5,3" filter="url(#d1r2)"/>
+          <text x="715" y="88" font-size="11" fill="#0c8599" font-weight="600">NUMA Domain 1</text>
+          <rect x="715" y="96" width="100" height="28" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.3" filter="url(#d1r2)"/>
+          <text x="765" y="114" text-anchor="middle" font-size="11" font-weight="600">CPU ×32</text>
+          <rect x="830" y="96" width="100" height="28" rx="4" fill="#ffc9c9" stroke="#c92a2a" stroke-width="1.3" filter="url(#d1r2)"/>
+          <text x="880" y="114" text-anchor="middle" font-size="11" font-weight="600">NPU 代次B ×2</text>
+          <rect x="715" y="132" width="215" height="28" rx="4" fill="#e9ecef" stroke="#495057" stroke-width="1.2" filter="url(#d1r2)"/>
+          <text x="822" y="150" text-anchor="middle" font-size="11">DRAM 256GB · HBM 64GB</text>
+          <!-- 灵衢互联 -->
+          <line x1="675" y1="110" x2="695" y2="110" stroke="#7048e8" stroke-width="3"/>
+          <text x="685" y="100" text-anchor="middle" font-family="Caveat, cursive" font-size="12" fill="#7048e8">灵衢</text>
+          <text x="685" y="175" text-anchor="middle" font-family="Caveat, cursive" font-size="11" fill="#7048e8">~100ns 互联</text>
+          <!-- CXL 内存池 -->
+          <rect x="420" y="185" width="530" height="38" rx="6" fill="#fff3bf" stroke="#e67700" stroke-width="1.8" filter="url(#d1r2)"/>
+          <text x="685" y="209" text-anchor="middle" font-size="12" font-weight="600">CXL 内存池（可动态分配 / 超分）</text>
+          <!-- 底部：代次画像 -->
+          <text x="500" y="275" text-anchor="middle" font-family="Caveat, cursive" font-size="15" font-weight="700" fill="#0c8599">多代次算力画像</text>
+          <rect x="410" y="285" width="170" height="60" rx="6" fill="#fff" stroke="#e8590c" stroke-width="1.5" filter="url(#d1r2)"/>
+          <text x="495" y="305" text-anchor="middle" font-size="11" font-weight="700">代次 A（昇腾910B）</text>
+          <text x="495" y="322" text-anchor="middle" font-size="10.5" fill="#666">320 TFLOPS · 64GB HBM</text>
+          <text x="495" y="337" text-anchor="middle" font-size="10.5" fill="#666">CANN 接口</text>
+          <rect x="595" y="285" width="170" height="60" rx="6" fill="#fff" stroke="#c92a2a" stroke-width="1.5" filter="url(#d1r2)"/>
+          <text x="680" y="305" text-anchor="middle" font-size="11" font-weight="700">代次 B（昇腾910C）</text>
+          <text x="680" y="322" text-anchor="middle" font-size="10.5" fill="#666">640 TFLOPS · 128GB HBM</text>
+          <text x="680" y="337" text-anchor="middle" font-size="10.5" fill="#666">CANN 接口 · 更高互联</text>
+          <rect x="780" y="285" width="170" height="60" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.5" filter="url(#d1r2)"/>
+          <text x="865" y="305" text-anchor="middle" font-size="11" font-weight="700">代次 C（GPU H100）</text>
+          <text x="865" y="322" text-anchor="middle" font-size="10.5" fill="#666">989 TFLOPS · 80GB HBM3</text>
+          <text x="865" y="337" text-anchor="middle" font-size="10.5" fill="#666">CUDA 接口 · NVLink</text>
+        </svg>
+        <div class="dir-svg-caption">图 D1：从扁平资源模型到超节点拓扑感知模型的统一抽象</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 1.1 超节点感知的异构资源统一抽象与拓扑建模</div>
+        <div class="st-meta">关键词：Ray 资源模型扩展 · 多维拓扑距离 · 代次画像 · 池化粒度</div>
+        <div class="st-desc">扩展 Ray 扁平资源描述符，加入 NUMA 域、PCIe 域、灵衢互联距离等拓扑维度，建立多代次 NPU/GPU 的算力/内存/带宽画像，将池化粒度从整机细化到芯片及芯片内切片，为上层调度提供精确硬件信息。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 1.2 面向 CXL / 高速互联的内存池化与分层管理</div>
+        <div class="st-meta">关键词：CXL 内存池 · 多级内存自动迁移 · Ray 对象存储融合 · 超分</div>
+        <div class="st-desc">研究 HBM→DRAM→CXL 内存池→远端 SSD 的统一管理，实现 CXL 内存的动态分配与超分、基于访问热度的层级间自动迁移、与 Ray Plasma 对象存储的融合，以及 Aura 引擎的内存层级感知。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 1.3 多代次异构 NPU/GPU 的统一执行抽象</div>
+        <div class="st-meta">关键词：统一算子层 · 代次自适应分发 · 异构任务迁移 · 自动并行策略</div>
+        <div class="st-desc">屏蔽昇腾 CANN 与英伟达 CUDA 等编程接口差异，构建统一算子/任务抽象层，实现代次自适应的任务分发与降级、异构算力间的任务状态迁移，以及基于算力画像的自动并行策略选择。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="direction dir-2">
+    <div class="direction-header"><span class="dir-num">D2</span>分层协同调度与超大规模集群韧性</div>
+    <div class="direction-body">
+      <!-- D2 示意图 -->
+      <div class="dir-svg-wrap">
+        <svg viewBox="0 0 1000 390" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="d2r1" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter>
+            <filter id="d2r2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="8"/><feDisplacementMap in="SourceGraphic" scale="1.3"/></filter>
+            <marker id="d2arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1e1e1e"/></marker>
+            <marker id="d2arr-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1971c2"/></marker>
+            <marker id="d2arr-o" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#e8590c"/></marker>
+          </defs>
+          <!-- 上层：Aura 任务 DAG -->
+          <rect x="20" y="15" width="960" height="130" rx="8" fill="#d0ebff" stroke="#1971c2" stroke-width="2.5" filter="url(#d2r1)"/>
+          <text x="35" y="36" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#1971c2">Aura 任务调度层（数据流 DAG）</text>
+          <!-- DAG 节点 -->
+          <rect x="80" y="50" width="90" height="36" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.8" filter="url(#d2r2)"/>
+          <text x="125" y="73" text-anchor="middle" font-size="12" font-weight="600">Task A</text>
+          <rect x="280" y="50" width="90" height="36" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.8" filter="url(#d2r2)"/>
+          <text x="325" y="73" text-anchor="middle" font-size="12" font-weight="600">Task B</text>
+          <rect x="280" y="100" width="90" height="36" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.8" filter="url(#d2r2)"/>
+          <text x="325" y="123" text-anchor="middle" font-size="12" font-weight="600">Task C</text>
+          <rect x="500" y="75" width="90" height="36" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.8" filter="url(#d2r2)"/>
+          <text x="545" y="98" text-anchor="middle" font-size="12" font-weight="600">Task D</text>
+          <!-- DAG 边 -->
+          <line x1="170" y1="68" x2="275" y2="68" stroke="#1971c2" stroke-width="1.8" marker-end="url(#d2arr-b)"/>
+          <text x="222" y="60" text-anchor="middle" font-family="Caveat, cursive" font-size="11" fill="#1971c2">shuffle</text>
+          <line x1="170" y1="75" x2="275" y2="118" stroke="#1971c2" stroke-width="1.8" marker-end="url(#d2arr-b)"/>
+          <text x="200" y="105" font-family="Caveat, cursive" font-size="11" fill="#1971c2">p2p</text>
+          <line x1="370" y1="68" x2="495" y2="88" stroke="#1971c2" stroke-width="1.8" marker-end="url(#d2arr-b)"/>
+          <text x="420" y="72" font-family="Caveat, cursive" font-size="11" fill="#1971c2">all-reduce</text>
+          <line x1="370" y1="118" x2="495" y2="98" stroke="#1971c2" stroke-width="1.8" marker-end="url(#d2arr-b)"/>
+          <text x="420" y="120" font-family="Caveat, cursive" font-size="11" fill="#1971c2">broadcast</text>
+          <!-- 通信模式标注 -->
+          <rect x="640" y="50" width="320" height="80" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.3" stroke-dasharray="4,3" filter="url(#d2r2)"/>
+          <text x="655" y="70" font-size="11" font-weight="700" fill="#1971c2">任务语义标注（传递给 Ray）：</text>
+          <text x="655" y="88" font-size="10.5" fill="#555">• 通信密集型 / 计算密集型</text>
+          <text x="655" y="104" font-size="10.5" fill="#555">• 共置需求（需同超节点）/ 反共置</text>
+          <text x="655" y="120" font-size="10.5" fill="#555">• 数据局部性偏好 · SLA 等级</text>
+          <!-- 中间：语义双向传递 -->
+          <rect x="200" y="155" width="600" height="50" rx="8" fill="#fff3bf" stroke="#e67700" stroke-width="2.5" filter="url(#d2r1)"/>
+          <text x="500" y="175" text-anchor="middle" font-family="Caveat, cursive" font-size="15" font-weight="700" fill="#e67700">语义双向传递接口</text>
+          <text x="350" y="195" text-anchor="middle" font-size="10.5" fill="#e67700">↓ Aura→Ray：通信模式 / 共置需求 / 局部性</text>
+          <text x="680" y="195" text-anchor="middle" font-size="10.5" fill="#e67700">↑ Ray→Aura：拓扑 / 负载 / 故障域</text>
+          <!-- 下层：Ray 资源拓扑 -->
+          <rect x="20" y="220" width="960" height="160" rx="8" fill="#c5f6fa" stroke="#0c8599" stroke-width="2.5" filter="url(#d2r1)"/>
+          <text x="35" y="241" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#0c8599">Ray 资源调度层（拓扑感知联合放置）</text>
+          <!-- 超节点 0 -->
+          <rect x="50" y="255" width="400" height="110" rx="8" fill="#fff" stroke="#0c8599" stroke-width="2" filter="url(#d2r2)"/>
+          <text x="65" y="275" font-size="11" font-weight="700" fill="#0c8599">超节点 0（灵衢互联 ~100ns）</text>
+          <rect x="70" y="285" width="80" height="30" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="110" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-A1</text>
+          <rect x="160" y="285" width="80" height="30" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="200" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-A2</text>
+          <rect x="250" y="285" width="80" height="30" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="290" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-A3</text>
+          <rect x="340" y="285" width="80" height="30" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="380" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-A4</text>
+          <!-- 任务放置标注 -->
+          <text x="110" y="330" text-anchor="middle" font-size="9.5" fill="#2f9e44" font-weight="700">↑ Task A</text>
+          <text x="200" y="330" text-anchor="middle" font-size="9.5" fill="#2f9e44" font-weight="700">↑ Task B</text>
+          <text x="290" y="330" text-anchor="middle" font-size="9.5" fill="#2f9e44" font-weight="700">↑ Task D</text>
+          <text x="245" y="352" text-anchor="middle" font-size="10" fill="#2f9e44" font-family="Caveat, cursive">all-reduce 任务共置，通信快</text>
+          <!-- 超节点 1 -->
+          <rect x="540" y="255" width="400" height="110" rx="8" fill="#fff" stroke="#0c8599" stroke-width="2" filter="url(#d2r2)"/>
+          <text x="555" y="275" font-size="11" font-weight="700" fill="#0c8599">超节点 1（灵衢互联 ~100ns）</text>
+          <rect x="560" y="285" width="80" height="30" rx="4" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="600" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-B1</text>
+          <rect x="650" y="285" width="80" height="30" rx="4" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="690" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-B2</text>
+          <rect x="740" y="285" width="80" height="30" rx="4" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="780" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-B3</text>
+          <rect x="830" y="285" width="80" height="30" rx="4" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.3" filter="url(#d2r2)"/>
+          <text x="870" y="304" text-anchor="middle" font-size="10" font-weight="600">NPU-B4</text>
+          <text x="600" y="330" text-anchor="middle" font-size="9.5" fill="#2f9e44" font-weight="700">↑ Task C</text>
+          <text x="735" y="352" text-anchor="middle" font-size="10" fill="#c92a2a" font-family="Caveat, cursive">跨超节点 shuffle（慢，尽量避免）</text>
+          <!-- 跨节点标注 -->
+          <line x1="455" y1="310" x2="535" y2="310" stroke="#c92a2a" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#d2arr)"/>
+          <text x="495" y="300" text-anchor="middle" font-family="Caveat, cursive" font-size="10" fill="#c92a2a">跨节点 ~10μs</text>
+        </svg>
+        <div class="dir-svg-caption">图 D2：Aura 任务语义与 Ray 拓扑感知的双层协同调度与联合放置</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 2.1 Ray 资源调度与 Aura 任务调度的双层协同机制 <span class="hand-note">（核心枢纽）</span></div>
+        <div class="st-meta">关键词：双层调度接口 · 语义契约 · 联合放置优化 · 双重碎片化</div>
+        <div class="st-desc">设计 Ray 与 Aura 之间的语义双向传递接口：Aura 向 Ray 传递任务的通信模式、共置需求、数据局部性等 hint；Ray 向 Aura 反馈拓扑与负载状态。研究联合放置优化算法，避免两层独立决策导致的资源碎片和通信开销。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 2.2 拓扑感知的尾延迟优化与 SLA 保障</div>
+        <div class="st-meta">关键词：尾延迟预测 · 投机执行 · 共置/反共置 · QoS 分级</div>
+        <div class="st-desc">针对向量检索等在线场景，研究任务级尾延迟预测模型、与超节点拓扑结合的投机执行（straggler mitigation）、通信密集型任务的共置与反共置策略，以及 QoS 分级与抢占式调度。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 2.3 万节点级 Ray 控制面的稳定性与扩展</div>
+        <div class="st-meta">关键词：GCS 水平扩展 · 心跳风暴治理 · 分层调度 · 优雅降级</div>
+        <div class="st-desc">攻克 Ray 在万节点规模下的 GCS 瓶颈、心跳风暴、调度延迟激增等问题，研究 GCS 分层/分区扩展、增量状态同步、超节点内本地调度+全局调度的分层架构，以及大规模故障下的优雅降级与脑裂处理。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 2.4 集群韧性与作业动态迁移</div>
+        <div class="st-meta">关键词：增量 checkpoint · 无感迁移 · 故障域感知 · 弹性协同</div>
+        <div class="st-desc">针对超节点故障域大的特点，研究细粒度增量 checkpoint 与快速恢复、运行中作业的无感动态迁移、故障域感知的副本/分片放置，以及弹性伸缩与迁移的协同决策机制。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 2.5 多目标全局调度优化（性能 × 成本 × 能耗）</div>
+        <div class="st-meta">关键词：Pareto 多目标优化 · 功耗感知调度 · 成本弹性 · SLA 平衡</div>
+        <div class="st-desc">在超节点功耗墙和万节点能耗约束下，研究性能、成本、能耗、利用率的多目标 Pareto 优化模型，功耗/温度感知的超节点内算力调度，以及成本驱动的弹性决策。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="direction dir-3">
+    <div class="direction-header"><span class="dir-num">D3</span>多级内存与流式数据流转系统</div>
+    <div class="direction-body">
+      <!-- D3 示意图 -->
+      <div class="dir-svg-wrap">
+        <svg viewBox="0 0 1000 395" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="d3r1" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="6"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter>
+            <filter id="d3r2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="9"/><feDisplacementMap in="SourceGraphic" scale="1.3"/></filter>
+            <marker id="d3arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#2f9e44"/></marker>
+            <marker id="d3arr-g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1e1e1e"/></marker>
+            <marker id="d3arr-r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#c92a2a"/></marker>
+          </defs>
+          <!-- 顶部：统一对象模型 -->
+          <rect x="300" y="10" width="400" height="32" rx="6" fill="#fff3bf" stroke="#e67700" stroke-width="2" filter="url(#d3r1)"/>
+          <text x="500" y="31" text-anchor="middle" font-size="13" font-weight="700" fill="#e67700">统一数据对象模型（schema + 元数据 + 引用计数）</text>
+          <!-- 三级流转层 -->
+          <text x="500" y="60" text-anchor="middle" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#2f9e44">三级数据流转层（自动升降级 · 零拷贝跨层）</text>
+          <!-- 远端 Cache -->
+          <rect x="40" y="72" width="260" height="105" rx="8" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2.5" filter="url(#d3r1)"/>
+          <text x="170" y="95" text-anchor="middle" font-size="14" font-weight="700" fill="#2f9e44">远端 Cache 层</text>
+          <rect x="60" y="105" width="220" height="28" rx="4" fill="#fff" stroke="#2f9e44" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="170" y="123" text-anchor="middle" font-size="11">SSD / 分布式缓存</text>
+          <rect x="60" y="138" width="220" height="28" rx="4" fill="#fff" stroke="#2f9e44" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="170" y="156" text-anchor="middle" font-size="11">冷数据 · 大容量 · 高延迟</text>
+          <!-- Ray 对象存储 -->
+          <rect x="370" y="72" width="260" height="105" rx="8" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2.5" filter="url(#d3r1)"/>
+          <text x="500" y="95" text-anchor="middle" font-size="14" font-weight="700" fill="#2f9e44">Ray 数据系统层</text>
+          <rect x="390" y="105" width="220" height="28" rx="4" fill="#fff" stroke="#2f9e44" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="500" y="123" text-anchor="middle" font-size="11">Plasma 对象存储</text>
+          <rect x="390" y="138" width="220" height="28" rx="4" fill="#fff" stroke="#2f9e44" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="500" y="156" text-anchor="middle" font-size="11">温数据 · 共享内存 · 中延迟</text>
+          <!-- 进程内内存 -->
+          <rect x="700" y="72" width="260" height="105" rx="8" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2.5" filter="url(#d3r1)"/>
+          <text x="830" y="95" text-anchor="middle" font-size="14" font-weight="700" fill="#2f9e44">进程内内存层</text>
+          <rect x="720" y="105" width="220" height="28" rx="4" fill="#fff" stroke="#2f9e44" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="830" y="123" text-anchor="middle" font-size="11">Heap / 栈 / 寄存器</text>
+          <rect x="720" y="138" width="220" height="28" rx="4" fill="#fff" stroke="#2f9e44" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="830" y="156" text-anchor="middle" font-size="11">热数据 · 零拷贝 · 纳秒级</text>
+          <!-- 双向箭头 -->
+          <line x1="305" y1="120" x2="365" y2="120" stroke="#2f9e44" stroke-width="2.5" marker-end="url(#d3arr)"/>
+          <line x1="365" y1="132" x2="305" y2="132" stroke="#2f9e44" stroke-width="2.5" marker-end="url(#d3arr)"/>
+          <text x="335" y="110" text-anchor="middle" font-family="Caveat, cursive" font-size="11" fill="#2f9e44">升级↑</text>
+          <text x="335" y="148" text-anchor="middle" font-family="Caveat, cursive" font-size="11" fill="#2f9e44">降级↓</text>
+          <line x1="635" y1="120" x2="695" y2="120" stroke="#2f9e44" stroke-width="2.5" marker-end="url(#d3arr)"/>
+          <line x1="695" y1="132" x2="635" y2="132" stroke="#2f9e44" stroke-width="2.5" marker-end="url(#d3arr)"/>
+          <text x="665" y="110" text-anchor="middle" font-family="Caveat, cursive" font-size="11" fill="#2f9e44">升级↑</text>
+          <text x="665" y="148" text-anchor="middle" font-family="Caveat, cursive" font-size="11" fill="#2f9e44">降级↓</text>
+          <!-- 热度驱动标注 -->
+          <text x="500" y="195" text-anchor="middle" font-family="Caveat, cursive" font-size="13" fill="#e8590c">← 访问热度驱动自动升降级 · RDMA/共享内存零拷贝 →</text>
+          <!-- 下半部分：流式语义 + Shuffle -->
+          <line x1="30" y1="210" x2="970" y2="210" stroke="#ccc" stroke-width="1.5" stroke-dasharray="6,4"/>
+          <text x="500" y="228" text-anchor="middle" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#2f9e44">流式数据语义 + 高性能通信</text>
+          <!-- 左侧：生产者-消费者管道 -->
+          <rect x="40" y="240" width="430" height="140" rx="8" fill="#fff" stroke="#2f9e44" stroke-width="2" filter="url(#d3r1)"/>
+          <text x="255" y="262" text-anchor="middle" font-size="13" font-weight="700" fill="#2f9e44">分布式共享内存 · 流式生产者-消费者</text>
+          <!-- 生产者 -->
+          <rect x="60" y="280" width="80" height="36" rx="5" fill="#d3f9d8" stroke="#2f9e44" stroke-width="1.5" filter="url(#d3r2)"/>
+          <text x="100" y="302" text-anchor="middle" font-size="11" font-weight="600">生产者 P1</text>
+          <rect x="60" y="325" width="80" height="36" rx="5" fill="#d3f9d8" stroke="#2f9e44" stroke-width="1.5" filter="url(#d3r2)"/>
+          <text x="100" y="347" text-anchor="middle" font-size="11" font-weight="600">生产者 P2</text>
+          <!-- 队列 -->
+          <rect x="170" y="290" width="120" height="60" rx="5" fill="#fff3bf" stroke="#e67700" stroke-width="1.5" stroke-dasharray="4,3" filter="url(#d3r2)"/>
+          <text x="230" y="315" text-anchor="middle" font-size="11" font-weight="600">流式队列</text>
+          <text x="230" y="332" text-anchor="middle" font-size="10" fill="#666">背压控制</text>
+          <text x="230" y="345" text-anchor="middle" font-size="10" fill="#666">exactly-once</text>
+          <!-- 消费者 -->
+          <rect x="320" y="280" width="80" height="36" rx="5" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5" filter="url(#d3r2)"/>
+          <text x="360" y="302" text-anchor="middle" font-size="11" font-weight="600">消费者 C1</text>
+          <rect x="320" y="325" width="80" height="36" rx="5" fill="#d0ebff" stroke="#1971c2" stroke-width="1.5" filter="url(#d3r2)"/>
+          <text x="360" y="347" text-anchor="middle" font-size="11" font-weight="600">消费者 C2</text>
+          <!-- 箭头 -->
+          <line x1="145" y1="298" x2="165" y2="310" stroke="#1e1e1e" stroke-width="1.5" marker-end="url(#d3arr-g)"/>
+          <line x1="145" y1="343" x2="165" y2="330" stroke="#1e1e1e" stroke-width="1.5" marker-end="url(#d3arr-g)"/>
+          <line x1="295" y1="310" x2="315" y2="298" stroke="#1e1e1e" stroke-width="1.5" marker-end="url(#d3arr-g)"/>
+          <line x1="295" y1="330" x2="315" y2="343" stroke="#1e1e1e" stroke-width="1.5" marker-end="url(#d3arr-g)"/>
+          <text x="255" y="378" text-anchor="middle" font-family="Caveat, cursive" font-size="12" fill="#2f9e44">可变共享内存 · 增量追加 · 细粒度消费</text>
+          <!-- 右侧：Shuffle/RDMA -->
+          <rect x="510" y="240" width="450" height="140" rx="8" fill="#fff" stroke="#7048e8" stroke-width="2" filter="url(#d3r1)"/>
+          <text x="735" y="262" text-anchor="middle" font-size="13" font-weight="700" fill="#7048e8">大规模 Shuffle · RDMA / 灵衢高速通信</text>
+          <!-- Worker 行 -->
+          <rect x="530" y="280" width="60" height="30" rx="4" fill="#e5dbff" stroke="#7048e8" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="560" y="299" text-anchor="middle" font-size="10" font-weight="600">W1</text>
+          <rect x="530" y="330" width="60" height="30" rx="4" fill="#e5dbff" stroke="#7048e8" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="560" y="349" text-anchor="middle" font-size="10" font-weight="600">W2</text>
+          <rect x="870" y="280" width="60" height="30" rx="4" fill="#e5dbff" stroke="#7048e8" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="900" y="299" text-anchor="middle" font-size="10" font-weight="600">W3</text>
+          <rect x="870" y="330" width="60" height="30" rx="4" fill="#e5dbff" stroke="#7048e8" stroke-width="1.3" filter="url(#d3r2)"/>
+          <text x="900" y="349" text-anchor="middle" font-size="10" font-weight="600">W4</text>
+          <!-- Shuffle 交叉线 -->
+          <line x1="595" y1="290" x2="865" y2="290" stroke="#7048e8" stroke-width="1.2" opacity="0.6"/>
+          <line x1="595" y1="295" x2="865" y2="345" stroke="#7048e8" stroke-width="1.2" opacity="0.6"/>
+          <line x1="595" y1="345" x2="865" y2="295" stroke="#7048e8" stroke-width="1.2" opacity="0.6"/>
+          <line x1="595" y1="350" x2="865" y2="350" stroke="#7048e8" stroke-width="1.2" opacity="0.6"/>
+          <!-- 中间标注 -->
+          <rect x="660" y="295" width="120" height="50" rx="5" fill="#fff3bf" stroke="#e67700" stroke-width="1.5" filter="url(#d3r2)"/>
+          <text x="720" y="315" text-anchor="middle" font-size="11" font-weight="700">RDMA Shuffle</text>
+          <text x="720" y="332" text-anchor="middle" font-size="10" fill="#666">拓扑感知放置</text>
+          <text x="720" y="345" text-anchor="middle" font-size="10" fill="#666">不落盘 · 聚合通信</text>
+          <text x="735" y="378" text-anchor="middle" font-family="Caveat, cursive" font-size="12" fill="#7048e8">Shuffle 开销降低 50%+ · 减少跨超节点流量</text>
+        </svg>
+        <div class="dir-svg-caption">图 D3：三级数据流转统一语义 + 流式共享内存 + RDMA Shuffle 通信</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 3.1 三级数据流转层的统一对象模型与零拷贝协同</div>
+        <div class="st-meta">关键词：统一对象模型 · 自动升降级 · 零拷贝跨层 · 生命周期一致性</div>
+        <div class="st-desc">统一远端 Cache、Ray 对象存储、进程内内存三层的数据对象模型（schema+元数据+引用计数），研究基于热度和访问模式的自动升降级策略、RDMA/共享内存的零拷贝跨层访问，以及跨层数据生命周期与引用一致性管理。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 3.2 分布式共享内存与流式数据语义</div>
+        <div class="st-meta">关键词：可变共享内存 · 生产者-消费者 · 背压 · exactly-once</div>
+        <div class="st-desc">突破 Ray 对象存储不可变的限制，在其上构建支持增量追加和细粒度共享的分布式共享内存抽象，定义流式生产者-消费者语义与背压控制机制，保障 exactly-once / at-least-once 语义，并与 Aura 流式算子对接。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 3.3 大规模 Shuffle 与超节点高速通信优化</div>
+        <div class="st-meta">关键词：RDMA/灵衢 shuffle · 拓扑感知放置 · 聚合通信 · 不落盘 shuffle</div>
+        <div class="st-desc">设计基于 RDMA/RoCE/灵衢互联的 shuffle 原语，研究点对点与聚合通信的混合策略、shuffle 数据的拓扑感知放置（减少跨超节点流量），以及与 Aura 执行引擎融合的不落盘 shuffle。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 3.4 面向强化学习的 Sample 级数据系统</div>
+        <div class="st-meta">关键词：Sample 时效性 · 优先级队列 · 生成-训练协同 · 多智能体路由</div>
+        <div class="st-desc">针对 RL 训练中 sample 生成与消费速率不匹配、sample 时效性衰减的特点，研究 Sample 级优先级队列与时效性管理、反压驱动的探索力度调整、sample 数据的分布式缓存与路由，以及多智能体场景下的数据分发。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="direction dir-4">
+    <div class="direction-header"><span class="dir-num">D4</span>面向 Agent 与多模态的轨迹数据引擎（Aura 核心）</div>
+    <div class="direction-body">
+      <!-- D4 示意图 -->
+      <div class="dir-svg-wrap">
+        <svg viewBox="0 0 1000 395" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="d4r1" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="10"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter>
+            <filter id="d4r2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="12"/><feDisplacementMap in="SourceGraphic" scale="1.3"/></filter>
+            <marker id="d4arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#7048e8"/></marker>
+            <marker id="d4arr-g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1e1e1e"/></marker>
+          </defs>
+          <!-- 左侧：Agent 轨迹输入 -->
+          <rect x="20" y="20" width="230" height="355" rx="8" fill="#e5dbff" stroke="#7048e8" stroke-width="2.5" filter="url(#d4r1)"/>
+          <text x="135" y="42" text-anchor="middle" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#7048e8">Agent 轨迹数据输入</text>
+          <!-- JSON 树形 -->
+          <rect x="40" y="55" width="190" height="105" rx="5" fill="#fff" stroke="#7048e8" stroke-width="1.5" filter="url(#d4r2)"/>
+          <text x="55" y="73" font-family="monospace" font-size="9.5" fill="#495057">{</text>
+          <text x="65" y="86" font-family="monospace" font-size="9.5" fill="#495057">"session_id": "xxx",</text>
+          <text x="65" y="99" font-family="monospace" font-size="9.5" fill="#495057">"timestamp": 12345,</text>
+          <text x="65" y="112" font-family="monospace" font-size="9.5" fill="#495057">"steps": [{</text>
+          <text x="75" y="125" font-family="monospace" font-size="9.5" fill="#c92a2a">"role": "agent",</text>
+          <text x="75" y="138" font-family="monospace" font-size="9.5" fill="#1971c2">"content": {...</text>
+          <text x="75" y="151" font-family="monospace" font-size="9.5" fill="#e67700">"image": [ref]}</text>
+          <!-- 数据特征标签 -->
+          <rect x="40" y="175" width="190" height="26" rx="4" fill="#ffc9c9" stroke="#c92a2a" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="135" y="192" text-anchor="middle" font-size="10.5" font-weight="600">复杂嵌套 JSON</text>
+          <rect x="40" y="208" width="190" height="26" rx="4" fill="#fff3bf" stroke="#e67700" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="135" y="225" text-anchor="middle" font-size="10.5" font-weight="600">多模态字段（文/图/音）</text>
+          <rect x="40" y="241" width="190" height="26" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="135" y="258" text-anchor="middle" font-size="10.5" font-weight="600">时间序列属性</text>
+          <rect x="40" y="274" width="190" height="26" rx="4" fill="#d3f9d8" stroke="#2f9e44" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="135" y="291" text-anchor="middle" font-size="10.5" font-weight="600">会话图结构（调用链）</text>
+          <text x="135" y="330" text-anchor="middle" font-family="Caveat, cursive" font-size="13" fill="#7048e8">传统列式存储不适用</text>
+          <text x="135" y="350" text-anchor="middle" font-family="Caveat, cursive" font-size="13" fill="#c92a2a">需半结构化统一模型</text>
+          <!-- 箭头到中间 -->
+          <line x1="255" y1="195" x2="285" y2="195" stroke="#7048e8" stroke-width="2.5" marker-end="url(#d4arr)"/>
+          <!-- 中间：处理流水线 -->
+          <text x="500" y="42" text-anchor="middle" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#7048e8">Aura 轨迹数据引擎流水线</text>
+          <!-- 解析层 -->
+          <rect x="290" y="55" width="200" height="80" rx="6" fill="#fff" stroke="#7048e8" stroke-width="2" filter="url(#d4r1)"/>
+          <text x="390" y="75" text-anchor="middle" font-size="12" font-weight="700">① 解析层（软硬加速）</text>
+          <rect x="305" y="85" width="80" height="24" rx="3" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="345" y="101" text-anchor="middle" font-size="9.5">FPGA/NPU</text>
+          <rect x="395" y="85" width="80" height="24" rx="3" fill="#d0ebff" stroke="#1971c2" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="435" y="101" text-anchor="middle" font-size="9.5">CPU 解析</text>
+          <text x="390" y="125" text-anchor="middle" font-size="10" fill="#666">自动索引 · 查询下推</text>
+          <!-- 索引层 -->
+          <rect x="290" y="150" width="200" height="100" rx="6" fill="#fff" stroke="#7048e8" stroke-width="2" filter="url(#d4r1)"/>
+          <text x="390" y="170" text-anchor="middle" font-size="12" font-weight="700">② 三重索引层</text>
+          <rect x="305" y="180" width="55" height="55" rx="4" fill="#d0ebff" stroke="#1971c2" stroke-width="1.3" filter="url(#d4r2)"/>
+          <text x="332" y="203" text-anchor="middle" font-size="9.5" font-weight="600">时序</text>
+          <text x="332" y="218" text-anchor="middle" font-size="9" fill="#666">索引</text>
+          <rect x="367" y="180" width="55" height="55" rx="4" fill="#d3f9d8" stroke="#2f9e44" stroke-width="1.3" filter="url(#d4r2)"/>
+          <text x="394" y="203" text-anchor="middle" font-size="9.5" font-weight="600">图</text>
+          <text x="394" y="218" text-anchor="middle" font-size="9" fill="#666">索引</text>
+          <rect x="429" y="180" width="55" height="55" rx="4" fill="#e5dbff" stroke="#7048e8" stroke-width="1.3" filter="url(#d4r2)"/>
+          <text x="456" y="203" text-anchor="middle" font-size="9.5" font-weight="600">向量</text>
+          <text x="456" y="218" text-anchor="middle" font-size="9" fill="#666">索引</text>
+          <!-- 存储层 -->
+          <rect x="290" y="265" width="200" height="80" rx="6" fill="#fff" stroke="#7048e8" stroke-width="2" filter="url(#d4r1)"/>
+          <text x="390" y="285" text-anchor="middle" font-size="12" font-weight="700">③ 存储层（行列混合）</text>
+          <rect x="305" y="295" width="80" height="38" rx="3" fill="#fff3bf" stroke="#e67700" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="345" y="312" text-anchor="middle" font-size="9.5">热字段</text>
+          <text x="345" y="325" text-anchor="middle" font-size="9" fill="#666">列存</text>
+          <rect x="395" y="295" width="80" height="38" rx="3" fill="#e9ecef" stroke="#495057" stroke-width="1.2" filter="url(#d4r2)"/>
+          <text x="435" y="312" text-anchor="middle" font-size="9.5">冷字段</text>
+          <text x="435" y="325" text-anchor="middle" font-size="9" fill="#666">行存</text>
+          <!-- 层间箭头 -->
+          <line x1="390" y1="138" x2="390" y2="148" stroke="#7048e8" stroke-width="2" marker-end="url(#d4arr)"/>
+          <line x1="390" y1="253" x2="390" y2="263" stroke="#7048e8" stroke-width="2" marker-end="url(#d4arr)"/>
+          <!-- 箭头到右侧 -->
+          <line x1="495" y1="195" x2="525" y2="195" stroke="#7048e8" stroke-width="2.5" marker-end="url(#d4arr)"/>
+          <!-- 右侧：查询输出 -->
+          <rect x="530" y="20" width="450" height="355" rx="8" fill="#e5dbff" stroke="#7048e8" stroke-width="2.5" filter="url(#d4r1)"/>
+          <text x="755" y="42" text-anchor="middle" font-family="Caveat, cursive" font-size="16" font-weight="700" fill="#7048e8">多模态统一检索输出</text>
+          <!-- 查询类型 -->
+          <rect x="555" y="60" width="195" height="65" rx="6" fill="#fff" stroke="#1971c2" stroke-width="1.8" filter="url(#d4r2)"/>
+          <text x="652" y="82" text-anchor="middle" font-size="12" font-weight="700">文本 / 关键词查询</text>
+          <text x="652" y="100" text-anchor="middle" font-size="10" fill="#666">SQL-like 过滤 + 全文检索</text>
+          <text x="652" y="115" text-anchor="middle" font-size="10" fill="#666">复杂字段谓词下推</text>
+          <rect x="765" y="60" width="195" height="65" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.8" filter="url(#d4r2)"/>
+          <text x="862" y="82" text-anchor="middle" font-size="12" font-weight="700">向量相似度检索</text>
+          <text x="862" y="100" text-anchor="middle" font-size="10" fill="#666">ANN 近似最近邻</text>
+          <text x="862" y="115" text-anchor="middle" font-size="10" fill="#666">多度量 · 增量索引</text>
+          <rect x="555" y="140" width="195" height="65" rx="6" fill="#fff" stroke="#e67700" stroke-width="1.8" filter="url(#d4r2)"/>
+          <text x="652" y="162" text-anchor="middle" font-size="12" font-weight="700">图像 / 多模态查询</text>
+          <text x="652" y="180" text-anchor="middle" font-size="10" fill="#666">以图搜文 · 以文搜图</text>
+          <text x="652" y="195" text-anchor="middle" font-size="10" fill="#666">跨模态联合检索</text>
+          <rect x="765" y="140" width="195" height="65" rx="6" fill="#fff" stroke="#7048e8" stroke-width="1.8" filter="url(#d4r2)"/>
+          <text x="862" y="162" text-anchor="middle" font-size="12" font-weight="700">轨迹回溯 / 图遍历</text>
+          <text x="862" y="180" text-anchor="middle" font-size="10" fill="#666">会话调用链追溯</text>
+          <text x="862" y="195" text-anchor="middle" font-size="10" fill="#666">时间范围 + 拓扑查询</text>
+          <!-- 混合检索 -->
+          <rect x="555" y="225" width="405" height="60" rx="6" fill="#fff3bf" stroke="#e67700" stroke-width="2" filter="url(#d4r1)"/>
+          <text x="757" y="248" text-anchor="middle" font-size="13" font-weight="700" fill="#e67700">混合检索 + 重排序（Hybrid Search + Rerank）</text>
+          <text x="757" y="268" text-anchor="middle" font-size="10.5" fill="#666">结构化过滤 × 向量相似度 × 时序约束 × 图拓扑 → 统一打分排序</text>
+          <!-- RAG 输出 -->
+          <rect x="555" y="305" width="405" height="55" rx="6" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2" filter="url(#d4r1)"/>
+          <text x="757" y="327" text-anchor="middle" font-size="12" font-weight="700" fill="#2f9e44">RAG 燃料输出</text>
+          <text x="757" y="347" text-anchor="middle" font-size="10.5" fill="#666">高质量上下文片段 · 多模态证据 · 可追溯引用</text>
+        </svg>
+        <div class="dir-svg-caption">图 D4：Agent 轨迹数据从复杂摄入到多模态混合检索的一体化引擎流水线</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 4.1 Agent 轨迹数据的统一模型与存储引擎</div>
+        <div class="st-meta">关键词：半结构化模型 · 时序+图双重索引 · 增量摄入 · 版本管理</div>
+        <div class="st-desc">针对 Agent 轨迹"嵌套 JSON + 多模态字段 + 时间序列 + 图结构"的混合特征，设计半结构化统一数据模型，实现时间序列与图结构的双重索引、增量摄入与版本管理，以及轨迹级生命周期与归档策略。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 4.2 复杂 JSON 处理的软硬结合加速</div>
+        <div class="st-meta">关键词：FPGA/NPU 解析加速 · 自动索引 · 行列混合布局 · 查询下推</div>
+        <div class="st-desc">研究复杂 JSON 解析的硬件加速路径（FPGA/智能网卡/NPU 侧核）、复杂字段的自动索引与物化、列式-行式混合布局（热字段列存、冷字段行存），以及查询下推与谓词下推优化。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 4.3 多模态向量湖的统一检索与增量索引</div>
+        <div class="st-meta">关键词：多度量统一索引 · 混合检索重排序 · 增量更新 · 精度-性能权衡</div>
+        <div class="st-desc">构建支持多距离度量、多精度的统一向量索引框架，研究文本/图像/音频/视频的多模态混合检索与重排序、向量索引的增量更新与合并策略，以及近似检索的精度-性能-内存三维权衡。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 4.4 非结构化数据的解析-特征-检索一体化流水线</div>
+        <div class="st-meta">关键词：自动解析 pipeline · 特征缓存复用 · 内容级检索 · RAG 质量评估</div>
+        <div class="st-desc">打通非结构化数据"解析→特征提取→切分→向量化→索引"的全流水线，研究特征提取与索引的协同（增量特征、共享特征缓存）、超越向量相似度的内容级检索，以及多模态 RAG 的数据准备与质量评估。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="direction dir-5">
+    <div class="direction-header"><span class="dir-num">D5</span>Serverless 与紧耦合的协同范式</div>
+    <div class="direction-body">
+      <!-- D5 示意图 -->
+      <div class="dir-svg-wrap">
+        <svg viewBox="0 0 1000 395" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="d5r1" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="14"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter>
+            <filter id="d5r2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="16"/><feDisplacementMap in="SourceGraphic" scale="1.3"/></filter>
+            <marker id="d5arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#e67700"/></marker>
+            <marker id="d5arr-g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1e1e1e"/></marker>
+            <marker id="d5arr-r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#c92a2a"/></marker>
+          </defs>
+          <!-- 左侧：传统 Serverless -->
+          <rect x="20" y="20" width="340" height="300" rx="10" fill="#ffc9c9" stroke="#c92a2a" stroke-width="2.5" filter="url(#d5r1)"/>
+          <text x="190" y="45" text-anchor="middle" font-family="Caveat, cursive" font-size="17" font-weight="700" fill="#c92a2a">传统 Serverless 模式</text>
+          <!-- 独立函数 -->
+          <rect x="45" y="65" width="80" height="50" rx="6" fill="#fff" stroke="#c92a2a" stroke-width="1.8" filter="url(#d5r2)"/>
+          <text x="85" y="88" text-anchor="middle" font-size="11" font-weight="600">函数 F1</text>
+          <text x="85" y="104" text-anchor="middle" font-size="9.5" fill="#868e96">无状态</text>
+          <rect x="150" y="65" width="80" height="50" rx="6" fill="#fff" stroke="#c92a2a" stroke-width="1.8" filter="url(#d5r2)"/>
+          <text x="190" y="88" text-anchor="middle" font-size="11" font-weight="600">函数 F2</text>
+          <text x="190" y="104" text-anchor="middle" font-size="9.5" fill="#868e96">无状态</text>
+          <rect x="255" y="65" width="80" height="50" rx="6" fill="#fff" stroke="#c92a2a" stroke-width="1.8" filter="url(#d5r2)"/>
+          <text x="295" y="88" text-anchor="middle" font-size="11" font-weight="600">函数 F3</text>
+          <text x="295" y="104" text-anchor="middle" font-size="9.5" fill="#868e96">无状态</text>
+          <!-- 隔离墙 -->
+          <line x1="135" y1="65" x2="135" y2="115" stroke="#c92a2a" stroke-width="2" stroke-dasharray="4,3"/>
+          <line x1="240" y1="65" x2="240" y2="115" stroke="#c92a2a" stroke-width="2" stroke-dasharray="4,3"/>
+          <!-- 慢通信 -->
+          <line x1="130" y1="90" x2="145" y2="90" stroke="#c92a2a" stroke-width="1.5" marker-end="url(#d5arr-r)"/>
+          <line x1="235" y1="90" x2="250" y2="90" stroke="#c92a2a" stroke-width="1.5" marker-end="url(#d5arr-r)"/>
+          <text x="190" y="135" text-anchor="middle" font-family="Caveat, cursive" font-size="12" fill="#c92a2a">TCP 跨进程通信 ~10-100μs</text>
+          <!-- 问题列表 -->
+          <rect x="40" y="155" width="300" height="150" rx="6" fill="#fff" stroke="#c92a2a" stroke-width="1.5" filter="url(#d5r2)"/>
+          <text x="190" y="175" text-anchor="middle" font-size="12" font-weight="700" fill="#c92a2a">核心问题</text>
+          <text x="55" y="198" font-size="11">✗ 冷启动秒级，紧耦合作业无法接受</text>
+          <text x="55" y="218" font-size="11">✗ 无状态，每次重新加载数据/模型</text>
+          <text x="55" y="238" font-size="11">✗ 函数间通信慢，不适合 all-reduce</text>
+          <text x="55" y="258" font-size="11">✗ 并行度调整需全局重启</text>
+          <text x="55" y="278" font-size="11">✗ 长短作业混部调度困难</text>
+          <text x="190" y="298" text-anchor="middle" font-family="Caveat, cursive" font-size="13" fill="#c92a2a">无法承载分布式训练 / 在线检索</text>
+          <!-- 中间箭头 -->
+          <line x1="370" y1="170" x2="440" y2="170" stroke="#e67700" stroke-width="3.5" marker-end="url(#d5arr)"/>
+          <text x="405" y="155" text-anchor="middle" font-family="Caveat, cursive" font-size="14" font-weight="700" fill="#e67700">协同</text>
+          <text x="405" y="190" text-anchor="middle" font-family="Caveat, cursive" font-size="14" font-weight="700" fill="#e67700">优化</text>
+          <!-- 中间关键技术 -->
+          <rect x="365" y="210" width="100" height="95" rx="6" fill="#fff3bf" stroke="#e67700" stroke-width="1.8" filter="url(#d5r2)"/>
+          <text x="415" y="230" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e67700">关键机制</text>
+          <text x="415" y="250" text-anchor="middle" font-size="9.5">状态外置恢复</text>
+          <text x="415" y="266" text-anchor="middle" font-size="9.5">智能预热预取</text>
+          <text x="415" y="282" text-anchor="middle" font-size="9.5">弹性 worker 增删</text>
+          <text x="415" y="298" text-anchor="middle" font-size="9.5">快速重连同步</text>
+          <!-- 右侧：紧耦合 Serverless -->
+          <rect x="470" y="20" width="510" height="300" rx="10" fill="#d3f9d8" stroke="#2f9e44" stroke-width="2.5" filter="url(#d5r1)"/>
+          <text x="725" y="45" text-anchor="middle" font-family="Caveat, cursive" font-size="17" font-weight="700" fill="#2f9e44">紧耦合 Serverless 模式（超节点内）</text>
+          <!-- 超节点框 -->
+          <rect x="495" y="60" width="460" height="120" rx="8" fill="#fff" stroke="#0c8599" stroke-width="2" stroke-dasharray="6,3" filter="url(#d5r2)"/>
+          <text x="510" y="80" font-size="11" font-weight="700" fill="#0c8599">超节点（灵衢高速互联 ~100ns）</text>
+          <!-- 有状态函数群 -->
+          <rect x="510" y="90" width="85" height="55" rx="6" fill="#d0ebff" stroke="#1971c2" stroke-width="1.8" filter="url(#d5r2)"/>
+          <text x="552" y="112" text-anchor="middle" font-size="11" font-weight="600">Worker W1</text>
+          <text x="552" y="128" text-anchor="middle" font-size="9.5" fill="#2f9e44">有状态</text>
+          <rect x="610" y="90" width="85" height="55" rx="6" fill="#d0ebff" stroke="#1971c2" stroke-width="1.8" filter="url(#d5r2)"/>
+          <text x="652" y="112" text-anchor="middle" font-size="11" font-weight="600">Worker W2</text>
+          <text x="652" y="128" text-anchor="middle" font-size="9.5" fill="#2f9e44">有状态</text>
+          <rect x="710" y="90" width="85" height="55" rx="6" fill="#d0ebff" stroke="#1971c2" stroke-width="1.8" filter="url(#d5r2)"/>
+          <text x="752" y="112" text-anchor="middle" font-size="11" font-weight="600">Worker W3</text>
+          <text x="752" y="128" text-anchor="middle" font-size="9.5" fill="#2f9e44">有状态</text>
+          <rect x="810" y="90" width="85" height="55" rx="6" fill="#e9ecef" stroke="#868e96" stroke-width="1.5" stroke-dasharray="4,3" filter="url(#d5r2)"/>
+          <text x="852" y="112" text-anchor="middle" font-size="11" font-weight="600" fill="#868e96">弹性 W4</text>
+          <text x="852" y="128" text-anchor="middle" font-size="9.5" fill="#868e96">按需增删</text>
+          <!-- 共享内存 -->
+          <rect x="510" y="152" width="385" height="22" rx="4" fill="#fff3bf" stroke="#e67700" stroke-width="1.3" filter="url(#d5r2)"/>
+          <text x="702" y="167" text-anchor="middle" font-size="10.5" font-weight="600">分布式共享内存 / CXL 池（零拷贝数据共享）</text>
+          <!-- 高速通信 -->
+          <line x1="600" y1="115" x2="605" y2="115" stroke="#2f9e44" stroke-width="2" marker-end="url(#d5arr-g)"/>
+          <line x1="700" y1="115" x2="705" y2="115" stroke="#2f9e44" stroke-width="2" marker-end="url(#d5arr-g)"/>
+          <line x1="800" y1="115" x2="805" y2="115" stroke="#2f9e44" stroke-width="2" stroke-dasharray="3,2" marker-end="url(#d5arr-g)"/>
+          <text x="702" y="142" text-anchor="middle" font-family="Caveat, cursive" font-size="11" fill="#2f9e44">RDMA / 灵衢互联 ~100ns · all-reduce 加速</text>
+          <!-- 优势列表 -->
+          <rect x="495" y="195" width="460" height="110" rx="6" fill="#fff" stroke="#2f9e44" stroke-width="1.5" filter="url(#d5r2)"/>
+          <text x="725" y="215" text-anchor="middle" font-size="12" font-weight="700" fill="#2f9e44">核心优势</text>
+          <text x="515" y="237" font-size="11">✓ 毫秒级冷启动（预热池 + 状态恢复）</text>
+          <text x="515" y="257" font-size="11">✓ 有状态函数，模型/数据常驻内存</text>
+          <text x="515" y="277" font-size="11">✓ 共享内存/RDMA 低延迟通信</text>
+          <text x="760" y="237" font-size="11">✓ 不中断的弹性并行度调整</text>
+          <text x="760" y="257" font-size="11">✓ 长短作业混合调度与隔离</text>
+          <text x="760" y="277" font-size="11">✓ 算力切片多租户高效装箱</text>
+          <text x="725" y="298" text-anchor="middle" font-family="Caveat, cursive" font-size="13" fill="#2f9e44">serverless 弹性 + 紧耦合性能 兼得</text>
+          <!-- 底部标注 -->
+          <text x="500" y="350" text-anchor="middle" font-family="Caveat, cursive" font-size="14" fill="#e67700">弹性与性能的根本矛盾 → 通过协同范式化解</text>
+          <text x="500" y="372" text-anchor="middle" font-size="11" fill="#868e96">有状态 Serverless · 细粒度弹性 · 超节点算力切片 · 快速重连同步</text>
+        </svg>
+        <div class="dir-svg-caption">图 D5：从传统无状态 Serverless 到超节点内紧耦合 Serverless 的协同范式演进</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 5.1 有状态 Serverless 与超快速冷启动</div>
+        <div class="st-meta">关键词：状态外置恢复 · 智能预热预取 · 函数间低延迟通信 · 长短作业混合</div>
+        <div class="st-desc">解决紧耦合作业对长驻进程和低延迟的需求与 serverless 冷启动的矛盾，研究有状态函数的状态外置与快速恢复、基于作业画像的智能预热与预取、函数间共享内存/RDMA 低延迟通信，以及长作业与短作业的混合调度。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 5.2 紧耦合作业的细粒度弹性（不中断并行度调整）</div>
+        <div class="st-meta">关键词：弹性并行度 · 容错弹性统一 · 快速重连 · SLA 驱动弹性</div>
+        <div class="st-desc">突破分布式训练等紧耦合作业并行度调整需全局重启的限制，研究不中断训练的 worker 增删、容错与弹性的统一机制、serverless 容器的快速重连与状态同步，以及 SLA 驱动的弹性决策。</div>
+      </div>
+      <div class="sub-topic">
+        <div class="st-title">课题 5.3 超节点内的 Serverless 算力切片与多租户隔离</div>
+        <div class="st-meta">关键词：vNPU/MIG 切片 · 带宽/IO 隔离 · 切片间高速通信 · 装箱算法</div>
+        <div class="st-desc">研究超节点内算力切片（昇腾 vNPU、NVIDIA MIG）的统一抽象与调度、内存带宽/IO/互联带宽的性能隔离（防止噪声邻居）、切片间高速通信原语，以及超节点级别的 serverless 装箱优化算法。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 六、业务价值 ==================== -->
+<section>
+  <h2 class="sec-title"><span class="num">06</span>业务价值</h2>
+  <p>上述研究方向不仅具有学术前沿价值，更直接转化为产品的核心竞争力。以下从五个维度阐述预期业务价值：</p>
+
+  <table class="value-table">
+    <thead>
+      <tr><th style="width:18%">价值维度</th><th style="width:42%">具体收益</th><th style="width:40%">关联研究课题</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>性能跃升</strong></td>
+        <td>超节点内通信延迟降低一个数量级，shuffle 开销降低 50%+，向量检索 P99 延迟稳定在毫秒级，复杂 JSON 处理吞吐量提升 3-10 倍。</td>
+        <td>1.1, 1.2, 2.1, 2.2, 3.1, 3.3, 4.2</td>
+      </tr>
+      <tr>
+        <td><strong>资源利用率</strong></td>
+        <td>通过拓扑感知调度、算力切片、CXL 内存池化和作业动态迁移，集群整体资源利用率从当前 30-40% 提升至 60%+，超节点算力充分释放。</td>
+        <td>1.1, 1.2, 2.4, 2.5, 5.3</td>
+      </tr>
+      <tr>
+        <td><strong>规模能力</strong></td>
+        <td>支撑万节点级超节点集群的稳定运行，Ray 控制面水平扩展，故障恢复时间从分钟级降至秒级，具备生产级大规模部署能力。</td>
+        <td>2.3, 2.4, 1.3</td>
+      </tr>
+      <tr>
+        <td><strong>成本优化</strong></td>
+        <td>serverless 细粒度弹性+紧耦合作业不中断伸缩，让昂贵的智算资源按需使用；多代次算力混部保护投资；能耗感知调度降低运营成本。</td>
+        <td>2.5, 5.1, 5.2, 1.3</td>
+      </tr>
+      <tr>
+        <td><strong>产品差异化</strong></td>
+        <td>Agent 轨迹数据引擎、多模态向量湖、RL Sample 级系统构成 Aura 的核心壁垒，在 AI 原生数据湖赛道建立不可替代的技术优势。</td>
+        <td>3.4, 4.1, 4.3, 4.4</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>合作预期产出</h3>
+  <div class="card-grid">
+    <div class="card blue">
+      <div class="card-title"><span class="dot"></span>学术成果</div>
+      <p>在 SOSP/OSDI/NSDI/ATC/VLDB/SIGMOD 等顶级会议发表论文，形成超节点系统软件领域的学术影响力。</p>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot"></span>技术专利</div>
+      <p>围绕双层协同调度、三级数据流转、Agent 轨迹引擎等核心创新点申请发明专利，构建知识产权壁垒。</p>
+    </div>
+    <div class="card yellow">
+      <div class="card-title"><span class="dot"></span>产品落地</div>
+      <p>研究成果分阶段融入 AI DataLake 产品，提升性能、规模和差异化能力，直接服务客户业务。</p>
+    </div>
+    <div class="card purple">
+      <div class="card-title"><span class="dot"></span>人才培养</div>
+      <p>联合培养研究生和博士后，建立校企人才通道，为团队持续输送系统软件方向的高端人才。</p>
+    </div>
+  </div>
+</section>
+
+<footer class="doc-footer">
+  AI DataLake × Ray × Aura 超节点深度研究合作方案 ｜ V1.0 ｜ 内部讨论稿
+</footer>
+
+</div>
+</body>
+</html>
